@@ -1,136 +1,361 @@
 <html>
   <head>
     <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/css?family=Abel" rel="stylesheet">
+    <style type="text/css">
+      body {
+        font-family: 'Abel', sans-serif;
+        font-size: 0.8em;
+      }
+
+      #logo {
+        border-top: 1px dotted black;
+        border-bottom: 1px dotted black;
+      }
+
+      #status {
+        border-top: 1px dotted black;
+        border-bottom: 1px dotted black;
+        padding: 0.5em 0em;
+        text-align: center;
+      }
+
+      #results {
+        border: 1px dotted black;
+        padding: 0.5em;
+      }
+
+      #writerText {
+        padding-top: 0.5em;
+      }
+
+      pre {
+        text-align: center;
+      }
+
+      input {
+        padding: 0.5em;
+      }
+
+      h2 {
+        margin-bottom: 0.2em;
+      }
+      h3 {
+        margin-top: 0.8em;
+        margin-bottom: 0.2em;
+      }
+    </style>
   </head>
+
   <body>
-    <input id="dbname" type="text" placeholder="Database name"/>
-    <button id="open" type="button">Open</button>
+    <div id="logo">
+      <pre>
+                 _     _ _         _ _     
+                | |   (_) |       | | |    
+       ___  _ __| |__  _| |_    __| | |__  
+      / _ \| '__| '_ \| | __|  / _\` | '_\ 
+     | (_) | |  | |_) | | |_  | (_| | |_) |
+      \___/|_|  |_.__/|_|\__|  \__,_|_.__/ 
+
+     Peer-to-Peer Database for the Decentralized Web
+     <a href="https://github.com/orbitdb/orbit-db" target="_blank">https://github.com/orbitdb/orbit-db</a>
+      </pre>
+    </div>
+    <h2>Open or Create A Local Database</h2>
+    <i>Open a database locally and create it if the database doesn't exist.</i>
     <br><br>
+    <input id="dbname" type="text" placeholder="Database name"/>
+    <button id="create" type="button" disabled>Open</button>
+    <select id="type">
+      <option value="eventlog">Eventlog</option>
+      <option value="feed">Feed</option>
+      <option value="keyvalue">Key-Value</option>
+      <option value="docstore">DocumentDB</option>
+      <option value="counter">Counter</option>
+    </select>
+    <input id="public" type="checkbox" checked> Public
+
+    <h2>Open A Remote Database</h2>
+    <i>Open a database from an OrbitDB address, eg. /orbitdb/QmfY3udPcWUD5NREjrUV351Cia7q4DXNcfyRLJzUPL3wPD/hello</i>
+    <br><br>
+    <input id="dbaddress" type="text" placeholder="Address"/>
+    <button id="open" type="button" disabled>Open</button>
+    <input id="readonly" type="checkbox" checked> Read-only
+    <br><br>
+    <div id="status">Init</div>
     <div id="output"></div>
+    <div id="writerText"></div>
 
     <script type="text/javascript" src="lib/orbitdb.min.js" charset="utf-8"></script>
     <script type="text/javascript" src="lib/ipfs.min.js" charset="utf-8"></script>
 
     <script type="text/javascript">
+      const creatures = [
+        '🐙', '🐷', '🐬', '🐞', 
+        '🐈', '🙉', '🐸', '🐓',
+        '🐊', '🕷', '🐠', '🐘',
+        '🐼', '🐰', '🐶', '🐥'
+      ]
+
       const elm = document.getElementById("output")
+      const statusElm = document.getElementById("status")
       const dbnameField = document.getElementById("dbname")
+      const dbAddressField = document.getElementById("dbaddress")
+      const createButton = document.getElementById("create")
       const openButton = document.getElementById("open")
+      const createType = document.getElementById("type")
+      const writerText = document.getElementById("writerText")
+      const publicCheckbox = document.getElementById("public")
+      const readonlyCheckbox = document.getElementById("readonly")
 
-      localStorage.debug = ''
+      function handleError(e) {
+        console.error(e.stack)
+        statusElm.innerHTML = e.message  
+      }
 
-      const openDatabase = () => {
-        openButton.disabled = true
-        elm.innerHTML = "Starting IPFS..."
+      let ipfsReady = false
+      let orbitdb, db
+      let count = 0
+      let interval = Math.floor((Math.random() * 300) + (Math.random() * 2000))
+      let updateInterval
 
-        const dbname = dbnameField.value
-        const time = new Date().getTime().toString()
-        const key = 'greeting'
+      openButton.disabled = true
+      createButton.disabled = true
+      statusElm.innerHTML = "Starting IPFS..."
 
-        const ipfs = new Ipfs({
-          repo: '/orbitdb/examples/browser/' + time + '/ipfs',
-          EXPERIMENTAL: {
-            pubsub: true,
+      const ipfs = new Ipfs({
+        // repo: '/orbitdb/examples/browser/ipfs' + new Date().getTime(),
+        repo: '/orbitdb/examples/browser/new/ipfs',
+        EXPERIMENTAL: {
+          pubsub: true,
+        },
+        config: {
+          Addresses: {
+            Swarm: [
+              // Use IPFS dev signal server
+              '/dns4/star-signal.cloud.ipfs.team/wss/p2p-webrtc-star',
+              // Use local signal server
+              // '/ip4/0.0.0.0/tcp/9090/wss/p2p-webrtc-star',
+            ]
           },
-        })
-
-        function handleError(e) {
-          console.error(e.stack)
-          elm.innerHTML = e.message  
+          Bootstrap: [],
+          Discovery: {
+            MDNS: {
+              Enabled: true,
+              Interval: 10
+            },
+            webRTCStar: {
+              Enabled: true
+            }
+          },
         }
+      })
 
-        ipfs.on('error', (e) => handleError(e))
+      ipfs.on('error', (e) => handleError(e))
+      ipfs.on('ready', () => {
+        openButton.disabled = false
+        createButton.disabled = false
+        statusElm.innerHTML = "IPFS Started"
+        orbitdb = new OrbitDB(ipfs)
+      })
 
-        ipfs.on('ready', () => {
-          let peerId
-          ipfs.id()
-            .then((id) => {
-              peerId = id.id
-              elm.innerHTML = "Loading database..."
+      const createDatabase = async () => {
+        const name = dbnameField.value
+        const type = createType.value
 
-              const orbitdb = new OrbitDB(ipfs)
+        openButton.disabled = true
+        createButton.disabled = true
 
-              const db = orbitdb.kvstore(dbname, { maxHistory: 5, path: '/orbitdb/examples/browser/keyvalue-' + time })
-              const log = orbitdb.eventlog(dbname + ".log", { maxHistory: 5, path: '/orbitdb/examples/browser/events-' + time })
-              const counter = orbitdb.counter(dbname + ".count", { maxHistory: 5, path: '/orbitdb/examples/browser/counter-' + time })
+        if (updateInterval)
+          clearInterval(updateInterval)
 
-              const creatures = ['👻', '🐙', '🐷', '🐬', '🐞', '🐈', '🙉', '🐸', '🐓']
-              const idx = Math.floor(Math.random() * creatures.length)
-              const creature = creatures[idx]
+        interval = Math.floor((Math.random() * 300) + (Math.random() * 2000))
+        writerText.innerHTML = ""
+        elm.innerHTML = ""
 
-              const interval = Math.floor((Math.random() * 5000) + 3000)
+        const public = publicCheckbox.checked
 
-              let count = 0
-              const query = () => {
-                const value = "GrEEtinGs from " + peerId + " " + creature + ": Hello #" + count + " (" + new Date().getTime() + ")"
-                // Set a key-value pair
-                count ++
-                db.put(key, value)
-                  .then(() => counter.inc()) // Increase the counter by one
-                  .then(() => log.add(value)) // Add an event to 'latest visitors' log
-                  .then(() => getData())
-                  .catch((e) => handleError(e))
+        try {
+          db = await orbitdb.open(name, { 
+            create: true, 
+            overwrite: true, 
+            type: type,
+            write: public ? ['*'] : [],
+          })
+
+          // When the database is ready (ie. loaded), display results
+          db.events.on('ready', () => queryAndRender(db))
+          // When database gets replicated with a peer, display results
+          db.events.on('replicated', () => queryAndRender(db))
+          // When we update the database, display result
+          db.events.on('write', () => queryAndRender(db))
+
+          // Load locally persisted database
+          let maxTotal = 0, loaded = 0
+          statusElm.innerHTML = "Creating database..."
+          db.events.on('load.progress', (address, hash, entry, progress, total) => {
+            loaded ++
+            maxTotal = Math.max.apply(null, [maxTotal, entry.clock.time, loaded])
+            statusElm.innerHTML = `Loading database... ${loaded} / ${maxTotal}`
+          })
+          await db.load()
+
+          statusElm.innerHTML = "Database is ready"
+          writerText.innerHTML = `Writing to database every ${interval} milliseconds...`
+
+          // Start update/insert loop
+          updateInterval = setInterval(async () => {
+            try {
+              await update(db)
+            } catch (e) {
+              console.error(e.toString())
+              if (e.toString() === 'Error: Not allowed to write') {
+                writerText.innerHTML = '<span style="color: red">' + e.toString() + '</span>'
+                clearInterval(updateInterval)
               }
+            }
+          }, interval)
+        } catch (e) {
+          console.error(e)
+        }
+        openButton.disabled = false
+        createButton.disabled = false
+      }
 
-              const getData = () => {
-                const result = db.get(key)
-                const latest = log.iterator({ limit: 5 }).collect()
-                const count  = counter.value
-                let swarmPeers = []
+      const openDatabase = async () => {
+        const address = dbAddressField.value
 
-                ipfs.swarm.peers()
-                  .then((swarm) => swarmPeers = swarm)
-                  .then(() => ipfs.pubsub.peers(db.path))
-                  .then((peers) => {
-                    const output = `
-                      <b>You are:</b> ${peerId} ${creature}<br>
-                      <b>Peers (database/network):</b> ${peers.length} / ${swarmPeers.length}<br>
-                      <b>Database:</b> ${db.path}<br>
-                      <br><b>Writing to database every ${interval} milliseconds...</b><br><br>
-                      <b>Key-Value Store</b>
-                      -------------------------------------------------------
-                      Key | Value
-                      -------------------------------------------------------
-                      ${key} | ${result}
-                      -------------------------------------------------------
+        if (updateInterval)
+          clearInterval(updateInterval)
 
-                      <b>Eventlog</b>
-                      -------------------------------------------------------
-                      Latest Updates
-                      -------------------------------------------------------
-                      ${latest.reverse().map((e) => e.payload.value).join('\n')}
+        openButton.disabled = true
+        createButton.disabled = true
 
-                      <b>Counter</b>
-                      -------------------------------------------------------
-                      Visitor Count: ${count}
-                      -------------------------------------------------------
-                      `
-                    elm.innerHTML = output.split("\n").join("<br>")
-                    console.log(db.path)
-                  })
+        interval = Math.floor((Math.random() * 300) + (Math.random() * 2000))
+
+        statusElm.innerHTML = "Connecting to peers..."
+        writerText.innerHTML = ""
+        elm.innerHTML = ""
+
+        try {
+          db = await orbitdb.open(address, { sync: true })
+
+          // When the database is ready (ie. loaded), display results
+          db.events.on('ready', () => queryAndRender(db))
+          // When database gets replicated with a peer, display results
+          db.events.on('replicated', () => queryAndRender(db))
+          // When we update the database, display result
+          db.events.on('write', () => queryAndRender(db))
+
+          // Load locally persisted database
+          let maxTotal = 0, loaded = 0
+          statusElm.innerHTML = "Loading database..."
+          db.events.on('load.progress', (address, hash, entry, progress, total) => {
+            loaded ++
+            maxTotal = Math.max.apply(null, [maxTotal, entry.clock.time, loaded, db._replicationInfo.max])
+            statusElm.innerHTML = `Loading database... ${loaded} / ${maxTotal}`
+          })
+          await db.load()
+
+          statusElm.innerHTML = "Database is ready"
+
+          if (!readonlyCheckbox.checked) {
+            writerText.innerHTML = `Writing to database every ${interval} milliseconds...`
+
+            // Start update/insert loop
+            updateInterval = setInterval(async () => {
+              try {
+                await update(db)
+              } catch (e) {
+                console.error(e.toString())
+                if (e.toString() === 'Error: Not allowed to write') {
+                  writerText.innerHTML = '<span style="color: red">' + e.toString() + '</span>'
+                  clearInterval(updateInterval)
+                }
               }
+            }, interval)
+          } else {
+            writerText.innerHTML = `Listening for updates to the database...`
+          }
+        } catch (e) {
+          console.error(e)
+        }
+        openButton.disabled = false
+        createButton.disabled = false
 
-              db.events.on('synced', () => getData())
-              counter.events.on('synced', () => getData())
-              log.events.on('synced', () => getData())
+      }
 
-              db.events.on('ready', () => getData())
-              counter.events.on('ready', () => getData())
-              log.events.on('ready', () => getData())
+      const update = async (db) => {
+        count ++
 
-              // Start query loop when the databse has loaded its history
-              db.load(10)
-                .then(() => counter.load(10))
-                .then(() => log.load(10))
-                .then(() => {
-                  count = counter.value
-                  setInterval(query, interval)
-                })
+        const time = new Date().toISOString()
+        const idx = Math.floor(Math.random() * creatures.length)
+        const creature = creatures[idx]
 
-            })
-        })
+        if (db.type === 'eventlog') {
+          const value = "GrEEtinGs from " + orbitdb.id + " " + creature + ": Hello #" + count + " (" + time + ")"
+          await db.add(value)
+        } else if (db.type === 'feed') {
+          const value = "GrEEtinGs from " + orbitdb.id + " " + creature + ": Hello #" + count + " (" + time + ")"
+          await db.add(value)
+        } else if (db.type === 'docstore') {
+          const value = { _id: 'peer1', avatar: creature, updated: time }
+          await db.put(value)
+        } else if (db.type === 'keyvalue') {
+          await db.set('mykey', creature)
+        } else if (db.type === 'counter') {
+          await db.inc(1)
+        } else {
+          throw new Error("Unknown datatbase type: ", db.type)
+        }
+      }
+
+      const query = (db) => {
+        if (db.type === 'eventlog')
+          return db.iterator({ limit: 5 }).collect()
+        else if (db.type === 'feed')
+          return db.iterator({ limit: 5 }).collect()
+        else if (db.type === 'docstore')
+          return db.get('peer1')
+        else if (db.type === 'keyvalue')
+          return db.get('mykey')
+        else if (db.type === 'counter')
+          return db.value
+        else
+          throw new Error("Unknown datatbase type: ", db.type)
+      }
+
+      const queryAndRender = async (db) => {
+        const networkPeers = await ipfs.swarm.peers()
+        const databasePeers = await ipfs.pubsub.peers(db.address.toString())
+
+        const result = query(db)
+
+        const output = `
+          <h2>${db.type.toUpperCase()}</h2>
+          <h3 id="remoteAddress">${db.address}</h3>
+          <div><i>Copy this address and use the 'Open Database' in another browser to replicate this database between peers.</i></div>
+          <br>
+          <div><b>Peer ID:</b> ${orbitdb.id}</div>
+          <div><b>Peers (database/network):</b> ${databasePeers.length} / ${networkPeers.length}</div>
+          <div><b>Oplog Size:</b> ${db._oplog.length}</div>
+          <h2>Results</h2>
+          <div id="results">
+            <div>
+            ${result && Array.isArray(result) && result.length > 0 && db.type !== 'docstore' && db.type !== 'keyvalue'
+              ? result.slice().reverse().map((e) => e.payload.value).join('<br>\n')
+              : db.type === 'docstore'
+                ? JSON.stringify(result, null, 2)
+                : result ? result.toString().replace('"', '').replace('"', '') : result
+            }
+            </div>
+            </div>
+          `
+        elm.innerHTML = output
       }
 
       openButton.addEventListener('click', openDatabase)
+      createButton.addEventListener('click', createDatabase)
     </script>
   </body>
 </html>

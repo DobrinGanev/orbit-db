@@ -2,6 +2,7 @@ module.exports = {
   timeout: 60000,
   dbname: 'orbit-db-tests',
   defaultIpfsConfig: {
+    start: true,
     EXPERIMENTAL: {
       pubsub: true
     },
@@ -25,6 +26,7 @@ module.exports = {
   },
   daemon1: {
     repo: './ipfs/orbitdb/tests/daemon1',
+    start: true,
     EXPERIMENTAL: {
       pubsub: true
     },
@@ -48,6 +50,7 @@ module.exports = {
   },
   daemon2: {
     repo: './ipfs/orbitdb/tests/daemon2',
+    start: true,
     EXPERIMENTAL: {
       pubsub: true
     },

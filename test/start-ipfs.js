@@ -2,7 +2,7 @@
 
 const IPFS = require('ipfs')
 
-const startIpfs = (config = {}) => {
+const startIpfs = (config = {}, start = true) => {
   return new Promise((resolve, reject) => {
     const ipfs = new IPFS(config)
     ipfs.on('error', reject)
