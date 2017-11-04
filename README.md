@@ -87,7 +87,7 @@ npm install
 ### Browser example
 
 ```
-npm run build:examples
+npm run build
 npm run examples:browser
 ```
 
