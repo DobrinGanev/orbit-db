@@ -53,7 +53,7 @@
     "test": "mocha",
     "build": "npm run build:dist && npm run build:examples",
     "build:examples": "webpack --config conf/webpack.example.config.js --sort-modules-by size",
-    "build:debug": "webpack --config conf/webpack.config.js --sort-modules-by size && cp dist/orbitdb.min.js examples/browser/lib/orbitdb.min.js",
-    "build:dist": "webpack --config conf/webpack.debug.config.js --sort-modules-by size && cp dist/orbitdb.js examples/browser/lib/orbitdb.min.js"
+    "build:dist": "webpack --config conf/webpack.config.js --sort-modules-by size && cp dist/orbitdb.min.js examples/browser/lib/orbitdb.min.js",
+    "build:debug": "webpack --config conf/webpack.debug.config.js --sort-modules-by size && cp dist/orbitdb.js examples/browser/lib/orbitdb.min.js"
   }
 }

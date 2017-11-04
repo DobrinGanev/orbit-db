@@ -11,16 +11,16 @@ const uglifyOptions = {
 }
 
 module.exports = {
-  entry: './examples/browser/index.js',
+  entry: './examples/browser/browser-webpack-example/index.js',
   output: {
-    filename: './examples/browser/bundle.js'
+    filename: './examples/browser/browser-webpack-example/bundle.js'
   },
   target: 'web',
   devtool: 'none',
   node: {
     console: false,
+    Buffer: true,
     process: 'mock',
-    Buffer: true
   },
   externals: {
     fs: '{}',
@@ -38,17 +38,17 @@ module.exports = {
       'node_modules',
       path.resolve(__dirname, '../node_modules')
     ],
-    alias: {
-      // These are needed because node-libs-browser depends on outdated
-      // versions
-      //
-      // Can be dropped once https://github.com/devongovett/browserify-zlib/pull/18
-      // is shipped
-      zlib: 'browserify-zlib-next',
-      // Can be dropped once https://github.com/webpack/node-libs-browser/pull/41
-      // is shipped
-      http: 'stream-http'
-    }
+    // alias: {
+    //   // These are needed because node-libs-browser depends on outdated
+    //   // versions
+    //   //
+    //   // Can be dropped once https://github.com/devongovett/browserify-zlib/pull/18
+    //   // is shipped
+    //   zlib: 'browserify-zlib-next',
+    //   // Can be dropped once https://github.com/webpack/node-libs-browser/pull/41
+    //   // is shipped
+    //   http: 'stream-http'
+    // }
   },
   resolveLoader: {
     modules: [

@@ -173,6 +173,7 @@ class OrbitDB {
       this._cache = new Cache(path.join(directory), cacheFilePath)
       await this._cache.load()
     } catch (e) {
+      console.warn(e)
       logger.warn("Couldn't load Cache:", e)
     }
 
@@ -297,6 +298,8 @@ class OrbitDB {
     const store = this.stores[address]
 
     if (store) {
+      store.events.removeAllListeners('load.progress')
+      store.events.removeAllListeners('replicated')
       store.events.removeAllListeners('write')
       store.events.removeAllListeners('ready')
       store.events.removeAllListeners('close')
