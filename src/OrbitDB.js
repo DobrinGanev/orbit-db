@@ -114,8 +114,13 @@ class OrbitDB {
     const dbAddress = OrbitDBAddress.parse(address)
 
     // Load local cache
-    this._cache = new Cache(path.join(directory), path.join(dbAddress.root, dbAddress.path))
-    await this._cache.load()
+    try {
+      const cacheFilePath = path.join(dbAddress.root, dbAddress.path)
+      this._cache = new Cache(path.join(directory), cacheFilePath)
+      await this._cache.load()
+    } catch (e) {
+      logger.warn("Couldn't load Cache:", e)
+    }
 
     // Check if we already have the database
     const haveDB = await this._cache.get('manifest')
@@ -155,7 +160,7 @@ class OrbitDB {
       } else {
         logger.warn(`Not a valid OrbitDB address '${address}', creating the database`)
         options.overwrite = options.overwrite ? options.overwrite : true
-        return this.create(address, options.type, options)        
+        return this.create(address, options.type, options)
       }
     }
 
@@ -163,8 +168,13 @@ class OrbitDB {
     const dbAddress = OrbitDBAddress.parse(address)
 
     // Load local cache
-    this._cache = new Cache(path.join(directory), path.join(dbAddress.root, dbAddress.path))
-    await this._cache.load()
+    try {
+      const cacheFilePath = path.join(dbAddress.root, dbAddress.path)
+      this._cache = new Cache(path.join(directory), cacheFilePath)
+      await this._cache.load()
+    } catch (e) {
+      logger.warn("Couldn't load Cache:", e)
+    }
 
     // Check if we have the database
     const haveDB = await this._cache.get('manifest')
