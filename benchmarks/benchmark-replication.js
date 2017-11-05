@@ -159,8 +159,6 @@ pMapSeries([conf1, conf2], d => startIpfs(d))
           // Metrics output for the reader
           let prevCount = 0
           setInterval(() => {
-            metrics2.seconds ++
-
             const result = db2.iterator({ limit: -1 }).collect()
             metrics2.totalQueries = result.length
             metrics2.queriesPerSecond = metrics2.totalQueries - prevCount
