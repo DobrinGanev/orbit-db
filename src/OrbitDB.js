@@ -86,8 +86,13 @@ class OrbitDB {
 
     // Create an AccessController
     const accessController = new AccessController(this._ipfs)
-    // Add ourselves as the admin of the database
-    accessController.add('admin', this.key.getPublic('hex'))
+    // Add admins of the database to the access controller
+    if (options && options.admin) {
+      options.admin.forEach(e => accessController.add('admin', e))
+    } else {
+      // Default is to add ourselves as the admin of the database
+      accessController.add('admin', this.key.getPublic('hex'))      
+    }
     // Add keys that can write to the database
     if (options && options.write) {
       options.write.forEach(e => accessController.add('write', e))
