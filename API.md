@@ -24,7 +24,9 @@ const IPFS = require('ipfs')
 const OrbitDB = require('orbit-db')
 
 const ipfs = new IPFS()
-const orbitdb = new OrbitDB(ipfs)
+ipfs.on('ready', () => {
+  const orbitdb = new OrbitDB(ipfs)
+})
 ```
 
 `orbitdb` is now the [OrbitDB](#orbitdb) instance we can use to interact with the databases.
@@ -86,25 +88,25 @@ Choose this options if you're using `orbitd-db` to develop **Desktop** (or "head
 
 ## orbitdb
 
-After creating an instance of `orbitd-db`, you can now access the different data stores.
+After creating an instance of `orbitd-db`, you can now access the different data stores. Creating a database instance, eg. with `orbitdb.keyvalue(...)`, returns a *Promise* that resolves to the database instance.
 
 ### kvstore(name)
 
   Package: 
-  [orbit-db-kvstore](https://github.com/haadcode/orbit-db-kvstore)
+  [orbit-db-kvstore](https://github.com/orbitdb/orbit-db-kvstore)
 
   ```javascript
-  const db = orbitdb.kvstore('application.settings')
+  const db = await orbitdb.kvstore('application.settings')
   ```
 
   - **put(key, value)**
     ```javascript
-    db.put('hello', { name: 'World' }).then(() => ...)
+    await db.put('hello', { name: 'World' })
     ```
 
   - **set(key, value)**
     ```javascript
-    db.set('hello', { name: 'Friend' }).then(() => ...)
+    await db.set('hello', { name: 'Friend' })
     ```
     
   - **get(key)**
@@ -121,14 +123,14 @@ After creating an instance of `orbitd-db`, you can now access the different data
     db.events.on('ready', () => {
       /* query */
     })
-    db.load()
+    await db.load()
     ```
 
   - **events**
 
     ```javascript
     db.events.on('ready', () => /* local database loaded in memory */ )
-    db.events.on('synced', () => /* query for updated results */ )
+    db.events.on('replicated', () => /* query for updated results */ )
     ```
 
     See [events](#events) for full description.
@@ -136,15 +138,15 @@ After creating an instance of `orbitd-db`, you can now access the different data
 ### eventlog(name)
 
   Package: 
-  [orbit-db-eventstore](https://github.com/haadcode/orbit-db-eventstore)
+  [orbit-db-eventstore](https://github.com/orbitdb/orbit-db-eventstore)
 
   ```javascript
-  const db = orbitdb.eventlog('site.visitors')
+  const db = await orbitdb.eventlog('site.visitors')
   ```
 
   - **add(event)**
     ```javascript
-    db.add({ name: 'User1' }).then((hash) => ...)
+    const hash = await db.add({ name: 'User1' })
     ```
     
   - **get(hash)**
@@ -169,16 +171,16 @@ After creating an instance of `orbitd-db`, you can now access the different data
 
     ```javascript
     db.events.on('ready', () => {
-      /* query */
+      /* database is now ready to be queried */
     })
-    db.load()
+    await db.load()
     ```
 
   - **events**
 
     ```javascript
     db.events.on('ready', () => /* local database loaded in memory */ )
-    db.events.on('synced', () => /* query for updated results */ )
+    db.events.on('replicated', () => /* query for updated results */ )
     ```
 
     See [events](#events) for full description.
@@ -186,15 +188,15 @@ After creating an instance of `orbitd-db`, you can now access the different data
 ### feed(name)
 
   Package: 
-  [orbit-db-feedstore](https://github.com/haadcode/orbit-db-feedstore)
+  [orbit-db-feedstore](https://github.com/orbitdb/orbit-db-feedstore)
 
   ```javascript
-  const db = orbitdb.feed('orbit-db.issues')
+  const db = await orbitdb.feed('orbit-db.issues')
   ```
 
   - **add(data)**
     ```javascript
-    db.add({ name: 'User1' }).then((hash) => ...)
+    const hash = await db.add({ name: 'User1' })
     ```
     
   - **get(hash)**
@@ -215,7 +217,7 @@ After creating an instance of `orbitd-db`, you can now access the different data
 
   - **remove(hash)**
     ```javascript
-    db.remove(hash).then((removed) => ...)
+    const hash = await db.remove(hash)
     ```
     
   - **load()**
@@ -226,14 +228,14 @@ After creating an instance of `orbitd-db`, you can now access the different data
     db.events.on('ready', () => {
       /* query */
     })
-    db.load()
+    await db.load()
     ```
 
   - **events**
 
     ```javascript
     db.events.on('ready', () => /* local database loaded in memory */ )
-    db.events.on('synced', () => /* query for updated results */ )
+    db.events.on('replicated', () => /* query for updated results */ )
     ```
 
     See [events](#events) for full description.
@@ -241,21 +243,21 @@ After creating an instance of `orbitd-db`, you can now access the different data
 ### docstore(name, options)
 
   Package: 
-  [orbit-db-docstore](https://github.com/shamb0t/orbit-db-docstore)
+  [orbit-db-docstore](https://github.com/orbitdb/orbit-db-docstore)
 
   ```javascript
-  const db = orbitdb.docstore('orbit.users.shamb0t.profile')
+  const db = await orbitdb.docstore('orbit.users.shamb0t.profile')
   ```
 
   By default, documents are indexed by field '_id'. You can also specify the field to index by:
 
   ```javascript
-  const db = orbitdb.docstore('orbit.users.shamb0t.profile', { indexBy: 'name' })
+  const db = await orbitdb.docstore('orbit.users.shamb0t.profile', { indexBy: 'name' })
   ```
 
   - **put(doc)**
     ```javascript
-    db.put({ _id: 'QmAwesomeIpfsHash', name: 'shamb0t', followers: 500 }).then((hash) => ...)
+    const hash = await db.put({ _id: 'QmAwesomeIpfsHash', name: 'shamb0t', followers: 500 })
     ```
     
   - **get(key)**
@@ -273,7 +275,7 @@ After creating an instance of `orbitd-db`, you can now access the different data
 
   - **del(key)**
     ```javascript
-    db.del('shamb0t').then((removed) => ...)
+    const hash = await db.del('shamb0t')
     ```
     
   - **load()**
@@ -284,14 +286,14 @@ After creating an instance of `orbitd-db`, you can now access the different data
     db.events.on('ready', () => {
       /* query */
     })
-    db.load()
+    await db.load()
     ```
 
   - **events**
 
     ```javascript
     db.events.on('ready', () => /* local database loaded in memory */ )
-    db.events.on('synced', () => /* query for updated results */ )
+    db.events.on('replicated', () => /* query for updated results */ )
     ```
 
     See [events](#events) for full description.
@@ -299,10 +301,10 @@ After creating an instance of `orbitd-db`, you can now access the different data
 ### counter(name)
 
   Package: 
-  [orbit-db-counterstore](https://github.com/haadcode/orbit-db-counterstore)
+  [orbit-db-counterstore](https://github.com/orbitdb/orbit-db-counterstore)
 
   ```javascript
-  const counter = orbitdb.counter('song_123.play_count')
+  const counter = await orbitdb.counter('song_123.play_count')
   ```
 
   - **value**
@@ -312,11 +314,11 @@ After creating an instance of `orbitd-db`, you can now access the different data
 
   - **inc([value])**
     ```javascript
-    counter.inc()
+    await counter.inc()
     counter.value // 1
-    counter.inc(7)
+    await counter.inc(7)
     counter.value // 8
-    counter.inc(-2)
+    await counter.inc(-2)
     counter.value // 8
     ```
     
@@ -328,14 +330,14 @@ After creating an instance of `orbitd-db`, you can now access the different data
     db.events.on('ready', () => {
       /* query */
     })
-    db.load()
+    await db.load()
     ```
 
   - **events**
 
     ```javascript
     db.events.on('ready', () => /* local database loaded in memory */ )
-    db.events.on('synced', () => /* query for updated results */ )
+    db.events.on('replicated', () => /* query for updated results */ )
     ```
 
     See [events](#events) for full description.
@@ -352,17 +354,16 @@ After creating an instance of `orbitd-db`, you can now access the different data
 
     Each database in `orbit-db` contains an `events` ([EventEmitter](https://nodejs.org/api/events.html)) object that emits events that describe what's happening in the database.
 
-    - `synced` - (dbname)
+    - `replicated` - (dbname)
 
-      Emitted when an update happens in the databases. Eg. when the database was synchronized with a peer. This is usually a good place to requery the database
-      for updated results, eg. if a value of a key was changed or if there are new
-      events in an event log.
+      Emitted when a the database was synced with another peer. This is usually a good place to requery the database
+      for updated results, eg. if a value of a key was changed or if there are new events in an event log.
 
       ```javascript
-      db.events.on('synced', () => ... )
+      db.events.on('replicated', () => ... )
       ```
 
-    - `sync` - (dbname)
+    - `replicate` - (dbname)
 
       Emitted before starting a database sync with a peer.
 
@@ -372,7 +373,7 @@ After creating an instance of `orbitd-db`, you can now access the different data
 
     - `load` - (dbname)
 
-      Emitted before loading the local database.
+      Emitted before loading the database.
 
       ```javascript
       db.events.on('load', (dbname) => ... )
@@ -394,12 +395,12 @@ After creating an instance of `orbitd-db`, you can now access the different data
       db.events.on('write', (dbname, hash, entry) => ... )
       ```
 
-    - `load.progress` - (dbname, hash, entry, progress)
+    - `progress.load` - (address, hash, entry, progress, total)
 
       Emitted while loading the local database, once for each entry. *dbname* is the name of the database that emitted the event. *hash* is the multihash of the entry that was just loaded. *entry* is the database operation entry. *progress* is a sequential number starting from 0 upon calling `load()`.
 
       ```javascript
-      db.events.on('load.porgress', (dbname, hash, entry, progress) => ... )
+      db.events.on('progress.load', (address, hash, entry, progress, total) => ... )
       ```
 
     - `error` - (error)
