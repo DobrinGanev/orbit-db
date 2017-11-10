@@ -9,7 +9,7 @@ class IPFSAccessController extends AccessController {
   }
 
   async load (address) {
-    // Transform '/ipfs/QmPFtHi3cmfZerxtH9ySLdzpg1yFhocYDZgEZywdUXHxFU' 
+    // Transform '/ipfs/QmPFtHi3cmfZerxtH9ySLdzpg1yFhocYDZgEZywdUXHxFU'
     // to 'QmPFtHi3cmfZerxtH9ySLdzpg1yFhocYDZgEZywdUXHxFU'
     if (address.indexOf('/ipfs') === 0)
       address = address.split('/')[2]
@@ -18,7 +18,7 @@ class IPFSAccessController extends AccessController {
       const dag = await this._ipfs.object.get(address)
       const obj = JSON.parse(dag.toJSON().data)
       this._access = obj
-    } catch(e) {
+    } catch (e) {
       console.log("ACCESS ERROR:", e)
     }
   }
@@ -29,7 +29,7 @@ class IPFSAccessController extends AccessController {
       const access = JSON.stringify(this._access, null, 2)
       const dag = await this._ipfs.object.put(new Buffer(access))
       hash = dag.toJSON().multihash.toString()
-    } catch(e) {
+    } catch (e) {
       console.log("ACCESS ERROR:", e)
     }
     return hash

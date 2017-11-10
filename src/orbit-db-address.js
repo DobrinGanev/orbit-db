@@ -20,10 +20,8 @@ class OrbitDBAddress {
       .filter(e => e !== '' && e !== ' ')
 
     const accessControllerHash = parts[0].indexOf('Qm') > -1 ? multihash.fromB58String(parts[0]) : null
-    let isMultihash = false
     try {
       multihash.validate(accessControllerHash)
-      isMultihash = true
     } catch (e) {
       return false
     }

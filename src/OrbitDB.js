@@ -33,12 +33,12 @@ class OrbitDB {
   }
 
   /* Databases */
-  async feed(address, options = {}) {
+  async feed (address, options = {}) {
     options = Object.assign({ create: true, type: 'feed' }, options)
     return this.open(address, options)
   }
 
-  async eventlog(address, options = {}) {
+  async eventlog (address, options = {}) {
     options = Object.assign({ create: true, type: 'eventlog' }, options)
     return this.open(address, options)
   }
@@ -48,21 +48,21 @@ class OrbitDB {
     return this.open(address, options)
   }
 
-  async kvstore(address, options) {
+  async kvstore (address, options) {
     return this.keyvalue(address, options)
   }
 
-  async counter(address, options = {}) {
+  async counter (address, options = {}) {
     options = Object.assign({ create: true, type: 'counter' }, options)
     return this.open(address, options)
   }
 
-  async docstore(address, options = {}) {
+  async docstore (address, options = {}) {
     options = Object.assign({ create: true, type: 'docstore' }, options)
     return this.open(address, options)
   }
 
-  disconnect() {
+  disconnect () {
     Object.keys(this.stores).forEach((e) => this.stores[e].close())
     if (this._pubsub) this._pubsub.disconnect()
     this.stores = {}
@@ -91,7 +91,7 @@ class OrbitDB {
       options.admin.forEach(e => accessController.add('admin', e))
     } else {
       // Default is to add ourselves as the admin of the database
-      accessController.add('admin', this.key.getPublic('hex'))      
+      accessController.add('admin', this.key.getPublic('hex'))
     }
     // Add keys that can write to the database
     if (options && options.write) {
@@ -229,7 +229,7 @@ class OrbitDB {
   }
 
   /* Private methods */
-  async _createStore(Store, address, options) {
+  async _createStore (Store, address, options) {
     const addr = address.toString()
 
     let accessController
@@ -258,7 +258,7 @@ class OrbitDB {
   }
 
   // Callback for receiving a message from the network
-  _onMessage(address, heads) {
+  _onMessage (address, heads) {
     const store = this.stores[address]
     try {
       logger.debug(`New messages in '${address}':\n`, JSON.stringify(heads, null, 2))
@@ -284,20 +284,20 @@ class OrbitDB {
   }
 
   // Callback for local writes to the database. We the update to pubsub.
-  _onWrite(address, hash, entry, heads) {
+  _onWrite (address, hash, entry, heads) {
     if(!heads) throw new Error("'heads' not defined")
     if(this._pubsub) setImmediate(() => this._pubsub.publish(address, heads))
   }
 
   // Callback for database being ready
-  _onReady(address, heads) {
+  _onReady (address, heads) {
     if(heads && this._pubsub) {
       setTimeout(() => this._pubsub.publish(address, heads), 1000)
     }
   }
 
-  _onClose(address) {
-    if(this._pubsub) 
+  _onClose (address) {
+    if(this._pubsub)
       this._pubsub.unsubscribe(address)
 
     const store = this.stores[address]
