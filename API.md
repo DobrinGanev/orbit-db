@@ -1,17 +1,19 @@
 # orbit-db API documentation
 
 OrbitDB provides various types of databases for different data models: 
-- [kvstore](#kvstorename) is a key-value database just like your favourite key-value database.
-- [eventlog](#eventlogname) is an append-only log with traversable history. Useful for *"latest N"* use cases or as a message queue.
+- [log](#lognameaddress) is an append-only log with traversable history. Useful for *"latest N"* use cases or as a message queue.
 - [feed](#feedname) is a log with traversable history. Entries can be added and removed. Useful for *"shopping cart" type of use cases, or for example as a feed of blog posts or "tweets".
+- [keyvalue](#keyvaluenameaddress) is a key-value database just like your favourite key-value database.
+- [docs](##docsnameaddress-options) is a document database to which documents can be stored and indexed by a specified key. Useful for example building search indices or version controlling documents and data.
 - [counter](#countername) for counting. Useful for example counting events separate from log/feed data.
-- [docstore](##docstorename-options) is a document database to which documents can be stored and indexed by a specified key. Useful for example building search indices or version controlling documents and data.
 
 Which database to use depends on your use case and data model.
 
-## Getting Started
+## Usage
 
-Install `orbit-db` and [ipfs](https://www.npmjs.com/package/ipfs) from npm:
+### Using as a module
+
+Install [orbit-db]((https://www.npmjs.com/package/orbit-db)) and [ipfs](https://www.npmjs.com/package/ipfs) from npm:
 
 ```
 npm install orbit-db ipfs
@@ -26,13 +28,31 @@ const OrbitDB = require('orbit-db')
 const ipfs = new IPFS()
 ipfs.on('ready', () => {
   const orbitdb = new OrbitDB(ipfs)
+
+  // Create / Open a database
+  const db = await orbitdb.log('hello')
+  await db.load()
+
+  // Listen for updates from peers
+  db.events.on('replicated', (address) => {
+    console.log(db.iterator({ limit: -1 }).collect())
+  })
+
+  // Add an entry
+  const hash = await db.add('world')
+  console.log(hash)
+  
+  // Query
+  const result = db.iterator({ limit: -1 }).collect()
+  console.log(result)
 })
 ```
 
 `orbitdb` is now the [OrbitDB](#orbitdb) instance we can use to interact with the databases.
 
-This will tell `orbit-db` to use the [Javascript implementation](https://github.com/ipfs/js-ipfs) of IPFS. Choose this options if you're using `orbitd-db` to develop **Browser** applications.
+This will tell `orbit-db` to use the [Javascript implementation](https://github.com/ipfs/js-ipfs) of IPFS. Choose this options if you're using `orbitd-db` to develop **browser** applications.
 
+### Using with a running IPFS daemon
 Alternatively, you can use [ipfs-api](https://npmjs.org/package/ipfs-api) to use `orbit-db` with a locally running IPFS daemon:
 
 ```
@@ -45,368 +65,350 @@ const OrbitDB = require('orbit-db')
 
 const ipfs = IpfsApi('localhost', '5001')
 const orbitdb = new OrbitDB(ipfs)
+const db = await orbitdb.log('hello')
+...
 ```
 
 `orbitdb` is now the [OrbitDB](#orbitdb) instance we can use to interact with the databases.
 
-Choose this options if you're using `orbitd-db` to develop **Desktop** (or "headless") applications, eg. with [Electron](https://electron.atom.io).
+Choose this options if you're using `orbitd-db` to develop **backend** or **desktop** applications, eg. with [Electron](https://electron.atom.io).
 
 
-## Usage
+## API
 
-- [orbitdb](#orbitdb)
-  - [kvstore(name)](#kvstorename)
-    - [put(key, value)](#kvstorename)
-    - [set(key, value)](#kvstorename)
-    - [get(key)](#kvstorename)
-    - [events](#kvstorename)
-  - [eventlog(name)](#eventlogname)
-    - [add(event)](#eventlogname)
-    - [get(hash)](#eventlogname)
-    - [iterator([options])](#eventlogname)
-    - [events](#eventlogname)
-  - [feed(name)](#feedname)
-    - [add(data)](#feedname)
-    - [get(hash)](#feedname)
-    - [iterator([options])](#feedname)
-    - [remove(hash)](#feedname)
-    - [events](#feedname)
-  - [docstore(name, options)](#docstorename-options)
-    - [put(doc)]()
-    - [get(hash)]()
-    - [query(mapper)]()
-    - [del(key)]()
-    - [events]()
-  - [counter(name)](#countername)
-    - [value](#countername)
-    - [inc([amount])](#countername)
-    - [events](#countername)
-  - [disconnect()](#disconnect)
+- [OrbitDB](#orbitdb)
+  - [constructor(ipfs, [directory], [options])](#constructoripfs-directory-options)
+  - [keyvalue(name|address)](#kvstorenameaddress)
+    - [put(key, value)](#kvstorenameaddress)
+    - [set(key, value)](#kvstorenameaddress)
+    - [get(key)](#kvstorenameaddress)
+  - [log(name|address)](#lognameaddress)
+    - [add(event)](#lognameaddress)
+    - [get(hash)](#lognameaddress)
+    - [iterator([options])](#lognameaddress)
+  - [feed(name|address)](#feednameaddress)
+    - [add(data)](#feednameaddress)
+    - [get(hash)](#feednameaddress)
+    - [remove(hash)](#feednameaddress)
+    - [iterator([options])](#feednameaddress)
+  - [docs(name|address, options)](#docsnameaddress-options)
+    - [put(doc)](#docsnameaddress-options)
+    - [get(hash)](#docsnameaddress-options)
+    - [query(mapper)](#docsnameaddress-options)
+    - [del(key)](#docsnameaddress-options)
+  - [counter(name|address)](#counternameaddress)
+    - [value](#counternameaddress)
+    - [inc([amount])](#counternameaddress)
+  - [stop()](#stop)
+- [Store](#store)
+  - [load()](#load)
+  - [close()](#close)
+  - [drop()](#drop)
   - [events](#events)
-    - [orbitdb](#events)
-    - [stores](#events)
+  - [key](#key)
+  - [type](#type)
 
-## orbitdb
+## OrbitDB
 
-After creating an instance of `orbitd-db`, you can now access the different data stores. Creating a database instance, eg. with `orbitdb.keyvalue(...)`, returns a *Promise* that resolves to the database instance.
+### constructor(ipfs, [directory], [options])
 
-### kvstore(name)
+```javascript
+const IPFS = require('ipfs')
+const OrbitDB = require('orbit-db')
 
-  Package: 
-  [orbit-db-kvstore](https://github.com/orbitdb/orbit-db-kvstore)
+const ipfs = new IPFS()
+ipfs.on('ready', () => {
+  const orbitdb = new OrbitDB(ipfs)
+})
+```
 
+After creating an `OrbitDB` instance , you can access the different data stores. Creating a database instance, eg. with `orbitdb.keyvalue(...)`, returns a *Promise* that resolves to a [database instance](#store). See the [Store](#store) section for details of common methods and properties.
+
+```javascript
+const db = await orbitdb.kvstore('profile')
+```
+
+### keyvalue(name|address)
+
+Module: [orbit-db-kvstore](https://github.com/orbitdb/orbit-db-kvstore)
+
+```javascript
+const db = await orbitdb.keyvalue('application.settings')
+// Or:
+const db = await orbitdb.keyvalue(anotherkvdb.address)
+```
+
+**See the [Store](#store) section for details of common methods and properties.**
+
+#### put(key, value)
   ```javascript
-  const db = await orbitdb.kvstore('application.settings')
+  await db.put('hello', { name: 'World' })
   ```
 
-  - **put(key, value)**
-    ```javascript
-    await db.put('hello', { name: 'World' })
-    ```
-
-  - **set(key, value)**
-    ```javascript
-    await db.set('hello', { name: 'Friend' })
-    ```
-    
-  - **get(key)**
-    ```javascript
-    const value = db.get('hello')
-    // { name: 'Friend' }
-    ```
-
-  - **load()**
-
-    Load the locally persisted database state to memory.
-
-    ```javascript
-    db.events.on('ready', () => {
-      /* query */
-    })
-    await db.load()
-    ```
-
-  - **events**
-
-    ```javascript
-    db.events.on('ready', () => /* local database loaded in memory */ )
-    db.events.on('replicated', () => /* query for updated results */ )
-    ```
-
-    See [events](#events) for full description.
-
-### eventlog(name)
-
-  Package: 
-  [orbit-db-eventstore](https://github.com/orbitdb/orbit-db-eventstore)
-
+#### set(key, value)
   ```javascript
-  const db = await orbitdb.eventlog('site.visitors')
+  await db.set('hello', { name: 'Friend' })
+  ```
+  
+#### get(key)
+  ```javascript
+  const value = db.get('hello')
+  // { name: 'Friend' }
   ```
 
-  - **add(event)**
-    ```javascript
-    const hash = await db.add({ name: 'User1' })
-    ```
-    
-  - **get(hash)**
-    ```javascript
-    const event = db.get(hash)
-      .map((e) => e.payload.value)
-    // { name: 'User1' }
-    ```
-    
-  - **iterator([options])**
-    ```javascript
-    // TODO: add all options - gt, gte, lt, lte, limit, reverse
-    const all = db.iterator({ limit: -1 })
-      .collect()
-      .map((e) => e.payload.value)
-    // [{ name: 'User1' }]
-    ```
-    
-  - **load()**
+### log(name|address)
 
-    Load the locally persisted database state to memory.
+Module: [orbit-db-eventstore](https://github.com/orbitdb/orbit-db-eventstore)
 
-    ```javascript
-    db.events.on('ready', () => {
-      /* database is now ready to be queried */
-    })
-    await db.load()
-    ```
+```javascript
+const db = await orbitdb.eventlog('site.visitors')
+// Or:
+const db = await orbitdb.eventlog(anotherlogdb.address)
+```
 
-  - **events**
+**See the [Store](#store) section for details of common methods and properties.**
 
-    ```javascript
-    db.events.on('ready', () => /* local database loaded in memory */ )
-    db.events.on('replicated', () => /* query for updated results */ )
-    ```
-
-    See [events](#events) for full description.
-
-### feed(name)
-
-  Package: 
-  [orbit-db-feedstore](https://github.com/orbitdb/orbit-db-feedstore)
-
+#### add(event)
   ```javascript
-  const db = await orbitdb.feed('orbit-db.issues')
+  const hash = await db.add({ name: 'User1' })
+  ```
+  
+#### get(hash)
+  ```javascript
+  const event = db.get(hash)
+    .map((e) => e.payload.value)
+  // { name: 'User1' }
+  ```
+  
+#### iterator([options])
+  ```javascript
+  // TODO: add all options - gt, gte, lt, lte, limit, reverse
+  const all = db.iterator({ limit: -1 })
+    .collect()
+    .map((e) => e.payload.value)
+  // [{ name: 'User1' }]
+  ```
+    
+### feed(name|address)
+
+Module: [orbit-db-feedstore](https://github.com/orbitdb/orbit-db-feedstore)
+
+```javascript
+const db = await orbitdb.feed('orbit-db.issues')
+// Or:
+const db = await orbitdb.feed(anotherfeeddb.address)
+```
+
+See the [Store](#store) section for details of common methods and properties.
+
+#### add(data)
+  ```javascript
+  const hash = await db.add({ name: 'User1' })
+  ```
+  
+#### get(hash)
+  ```javascript
+  const event = db.get(hash)
+    .map((e) => e.payload.value)
+  // { name: 'User1' }
+  ```
+  
+#### remove(hash)
+  ```javascript
+  const hash = await db.remove(hash)
+  ```
+  
+#### iterator([options])
+  ```javascript
+  // TODO: add all options - gt, gte, lt, lte, limit, reverse
+  const all = db.iterator({ limit: -1 })
+    .collect()
+    .map((e) => e.payload.value)
+  // [{ name: 'User1' }]
   ```
 
-  - **add(data)**
-    ```javascript
-    const hash = await db.add({ name: 'User1' })
-    ```
-    
-  - **get(hash)**
-    ```javascript
-    const event = db.get(hash)
-      .map((e) => e.payload.value)
-    // { name: 'User1' }
-    ```
-    
-  - **iterator([options])**
-    ```javascript
-    // TODO: add all options - gt, gte, lt, lte, limit, reverse
-    const all = db.iterator({ limit: -1 })
-      .collect()
-      .map((e) => e.payload.value)
-    // [{ name: 'User1' }]
-    ```
+### docs(name|address, options)
 
-  - **remove(hash)**
-    ```javascript
-    const hash = await db.remove(hash)
-    ```
-    
-  - **load()**
+Module: [orbit-db-docstore](https://github.com/orbitdb/orbit-db-docstore)
 
-    Load the locally persisted database state to memory.
+```javascript
+const db = await orbitdb.docs('orbit.users.shamb0t.profile')
+// Or:
+const db = await orbitdb.docs(anotherdocdb.address)
+```
 
-    ```javascript
-    db.events.on('ready', () => {
-      /* query */
-    })
-    await db.load()
-    ```
+By default, documents are indexed by field `_id`. You can also specify the field to index by:
 
-  - **events**
+```javascript
+const db = await orbitdb.docs('orbit.users.shamb0t.profile', { indexBy: 'name' })
+```
 
-    ```javascript
-    db.events.on('ready', () => /* local database loaded in memory */ )
-    db.events.on('replicated', () => /* query for updated results */ )
-    ```
+**See the [Store](#store) section for details of common methods and properties.**
 
-    See [events](#events) for full description.
-
-### docstore(name, options)
-
-  Package: 
-  [orbit-db-docstore](https://github.com/orbitdb/orbit-db-docstore)
-
+#### put(doc)
   ```javascript
-  const db = await orbitdb.docstore('orbit.users.shamb0t.profile')
+  const hash = await db.put({ _id: 'QmAwesomeIpfsHash', name: 'shamb0t', followers: 500 })
+  ```
+  
+#### get(key)
+  ```javascript
+  const profile = db.get('shamb0t')
+    .map((e) => e.payload.value)
+  // [{ _id: 'shamb0t', name: 'shamb0t', followers: 500 }]
+  ```
+  
+#### query(mapper)
+  ```javascript
+  const all = db.query((doc) => doc.followers >= 500)
+  // [{ _id: 'shamb0t', name: 'shamb0t', followers: 500 }]
   ```
 
-  By default, documents are indexed by field '_id'. You can also specify the field to index by:
-
+#### del(key)
   ```javascript
-  const db = await orbitdb.docstore('orbit.users.shamb0t.profile', { indexBy: 'name' })
+  const hash = await db.del('shamb0t')
+  ```
+    
+### counter(name|address)
+
+Module: [orbit-db-counterstore](https://github.com/orbitdb/orbit-db-counterstore)
+
+```javascript
+const counter = await orbitdb.counter('song_123.play_count')
+// Or:
+const counter = await orbitdb.counter(anothercounterdb.address)
+```
+
+**See the [Store](#store) section for details of common methods and properties.**
+
+#### value
+  ```javascript
+  counter.value // 0
   ```
 
-  - **put(doc)**
-    ```javascript
-    const hash = await db.put({ _id: 'QmAwesomeIpfsHash', name: 'shamb0t', followers: 500 })
-    ```
+#### inc([value])
+  ```javascript
+  await counter.inc()
+  counter.value // 1
+  await counter.inc(7)
+  counter.value // 8
+  await counter.inc(-2)
+  counter.value // 8
+  ```
     
-  - **get(key)**
-    ```javascript
-    const profile = db.get('shamb0t')
-      .map((e) => e.payload.value)
-    // [{ _id: 'shamb0t', name: 'shamb0t', followers: 500 }]
-    ```
-    
-  - **query(mapper)**
-    ```javascript
-    const all = db.query((doc) => doc.followers >= 500)
-    // [{ _id: 'shamb0t', name: 'shamb0t', followers: 500 }]
-    ```
+### stop()
 
-  - **del(key)**
-    ```javascript
-    const hash = await db.del('shamb0t')
-    ```
-    
-  - **load()**
-
-    Load the locally persisted database state to memory.
-
-    ```javascript
-    db.events.on('ready', () => {
-      /* query */
-    })
-    await db.load()
-    ```
-
-  - **events**
-
-    ```javascript
-    db.events.on('ready', () => /* local database loaded in memory */ )
-    db.events.on('replicated', () => /* query for updated results */ )
-    ```
-
-    See [events](#events) for full description.
-
-### counter(name)
-
-  Package: 
-  [orbit-db-counterstore](https://github.com/orbitdb/orbit-db-counterstore)
+  Stop OrbitDB, close databases and disconnect the databases from the network.
 
   ```javascript
-  const counter = await orbitdb.counter('song_123.play_count')
+  orbitdb.stop()
   ```
 
-  - **value**
-    ```javascript
-    counter.value // 0
-    ```
+## Store
 
-  - **inc([value])**
-    ```javascript
-    await counter.inc()
-    counter.value // 1
-    await counter.inc(7)
-    counter.value // 8
-    await counter.inc(-2)
-    counter.value // 8
-    ```
-    
-  - **load()**
+Every database (store) has the following methods available in addition to their specific methods.
 
-    Load the locally persisted database state to memory.
+#### load()
 
-    ```javascript
-    db.events.on('ready', () => {
-      /* query */
-    })
-    await db.load()
-    ```
+Load the locally persisted database state to memory.
 
-  - **events**
+With events:
+```javascript
+db.events.on('ready', () => {
+  /* database is now ready to be queried */
+})
+db.load()
+```
 
-    ```javascript
-    db.events.on('ready', () => /* local database loaded in memory */ )
-    db.events.on('replicated', () => /* query for updated results */ )
-    ```
+Async:
+```javascript
+await db.load()
+/* database is now ready to be queried */
+```
 
-    See [events](#events) for full description.
+#### close()
 
-### disconnect()
+Close the database.
+
+Async:
+```javascript
+await db.close()
+```
+
+#### drop()
+
+Remove the database locally. This does not delete any data from peers.
+
+```javascript
+await db.drop()
+```
+
+#### key
+
+The [keypair]([orbit-db-keystore]()) used to access the database.
+
+#### type
+
+The type of the database as a string.
+
+#### events
+
+Each database in `orbit-db` contains an `events` ([EventEmitter](https://nodejs.org/api/events.html)) object that emits events that describe what's happening in the database. Events can be listened to with:
+```javascript
+db.events.on(name, callback)
+```
+
+- **`replicated`** - (address)
+
+  Emitted when a the database was synced with another peer. This is usually a good place to re-query the database for updated results, eg. if a value of a key was changed or if there are new events in an event log.
 
   ```javascript
-  orbitdb.disconnect()
+  db.events.on('replicated', (address) => ... )
   ```
 
-### events
+- **`replicate`** - (address)
 
-  - **stores**
+  Emitted before replicating a part of the database with a peer.
 
-    Each database in `orbit-db` contains an `events` ([EventEmitter](https://nodejs.org/api/events.html)) object that emits events that describe what's happening in the database.
+  ```javascript
+  db.events.on('replicate', (address) => ... )
+  ```
 
-    - `replicated` - (dbname)
+- **`replicate.progress`** - (address, hash, entry, progress, have)
 
-      Emitted when a the database was synced with another peer. This is usually a good place to requery the database
-      for updated results, eg. if a value of a key was changed or if there are new events in an event log.
+  Emitted while replicating a database. *address* is id of the database that emitted the event. *hash* is the multihash of the entry that was just loaded. *entry* is the database operation entry. *progress* is the current progress. *have* is a map of database pieces we have.
 
-      ```javascript
-      db.events.on('replicated', () => ... )
-      ```
+  ```javascript
+  db.events.on('replicate.progress', (address, hash, entry, progress, have) => ... )
+  ```
 
-    - `replicate` - (dbname)
+- **`load`** - (dbname)
 
-      Emitted before starting a database sync with a peer.
+  Emitted before loading the database.
 
-      ```javascript
-      db.events.on('sync', (dbname) => ... )
-      ```
+  ```javascript
+  db.events.on('load', (dbname) => ... )
+  ```
 
-    - `load` - (dbname)
+- **`load.progress`** - (address, hash, entry, progress, total)
 
-      Emitted before loading the database.
+  Emitted while loading the local database, once for each entry. *dbname* is the name of the database that emitted the event. *hash* is the multihash of the entry that was just loaded. *entry* is the database operation entry. *progress* is a sequential number starting from 0 upon calling `load()`.
 
-      ```javascript
-      db.events.on('load', (dbname) => ... )
-      ```
+  ```javascript
+  db.events.on('load.progress', (address, hash, entry, progress, total) => ... )
+  ```
 
-    - `ready` - (dbname)
+- **`ready`** - (dbname)
 
-      Emitted after fully loading the local database.
+  Emitted after fully loading the local database.
 
-      ```javascript
-      db.events.on('ready', (dbname) => ... )
-      ```
+  ```javascript
+  db.events.on('ready', (dbname) => ... )
+  ```
 
-    - `write` - (dbname, hash, entry)
+- **`write`** - (dbname, hash, entry)
 
-      Emitted after an entry was added locally to the database. *hash* is the IPFS hash of the latest state of the database. *entry* is the added database op.
+  Emitted after an entry was added locally to the database. *hash* is the IPFS hash of the latest state of the database. *entry* is the added database op.
 
-      ```javascript
-      db.events.on('write', (dbname, hash, entry) => ... )
-      ```
-
-    - `progress.load` - (address, hash, entry, progress, total)
-
-      Emitted while loading the local database, once for each entry. *dbname* is the name of the database that emitted the event. *hash* is the multihash of the entry that was just loaded. *entry* is the database operation entry. *progress* is a sequential number starting from 0 upon calling `load()`.
-
-      ```javascript
-      db.events.on('progress.load', (address, hash, entry, progress, total) => ... )
-      ```
-
-    - `error` - (error)
-
-      Emitted on an error.
-
-      ```javascript
-      db.events.on('error', (err) => ... )
-      ```
+  ```javascript
+  db.events.on('write', (dbname, hash, entry) => ... )
+  ```
