@@ -26,7 +26,14 @@ ipfs.on('ready', () => {
 
 ## Create a database
 
-First, choose the data model you want to use and create a database instance:
+First, choose the data model you want to use. The available data models are: 
+- [Key-Value](https://github.com/orbitdb/orbit-db-kvstore)
+- [Log](https://github.com/orbitdb/orbit-db-eventstore) (append-only log)
+- [Feed](https://github.com/orbitdb/orbit-db-feedstore) (add and remove log)
+- [Documents](https://github.com/orbitdb/orbit-db-docstore) (indexed by custom fields)
+- [Counters](https://github.com/orbitdb/orbit-db-counterstore)
+
+Then, create a database instance (we'll use Key-Value database in this example):
 
 ```javascript
 const ipfs = new IPFS()
@@ -190,8 +197,35 @@ ipfs.on('ready', async () => {
 
 ## Replicating a database
 
-TODO
-- how to replicate a database between peers
+```javascript
+// Create the first peer
+const ipfs1 = new IPFS({ repo: './ipfs1' })
+ipfs1.on('ready', async () => {
+  // Create the database
+  const orbitdb1 = new OrbitDB(ipfs1, './orbitdb1')
+  const db1 = await orbitdb.log('events')
+
+  // Create the second peer
+  const ipfs2 = new IPFS({ repo: './ipfs2' })
+  ipfs2.on('ready', async () => {
+    // Open the first database for the second peer,
+    // ie. replicate the database
+    const orbitdb2 = new OrbitDB(ipfs2, './orbitdb2')
+    const db2 = await orbitdb2.log(db1.address.toString())
+
+    // When the second database replicated new heads, query the database
+    db2.events.on('replicated', () => {
+      const result = db2.iterator({ limit: -1 }).collect()
+      console.log(result.join('\n'))
+    })
+
+    // Start adding entries to the first database
+    setInterval(() => {
+      await db1.add({ time: new Date().getTime() })
+    }, 1000)
+  })
+})
+```
 
 ## Multiple writers
 
