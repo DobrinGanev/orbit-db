@@ -61,20 +61,119 @@ class OrbitDB {
     return this.open(address, options)
   }
 
-  async docstore (address, options = {}) {
+  async docs (address, options = {}) {
     options = Object.assign({ create: true, type: 'docstore' }, options)
     return this.open(address, options)
   }
 
-  disconnect () {
-    Object.keys(this.stores).forEach((e) => this.stores[e].close())
-    if (this._pubsub) this._pubsub.disconnect()
+  async docstore (address, options = {}) {
+    return this.docs(address, options)
+  }
+
+  async disconnect () {
+    // Close all open databases
+    const databases = Object.values(this.stores)
+    for (let db of databases) {
+      await db.close()
+      delete this.stores[db.address.toString()]
+    }
+
+    // Disconnect from pubsub
+    if (this._pubsub) 
+      this._pubsub.disconnect()
+
+    // Remove all databases from the state
     this.stores = {}
   }
 
+  // Alias for disconnect()
+  async stop () {
+    await this.disconnect()
+  }
+
+  /* Private methods */
+  async _createStore (Store, address, options) {
+    const addr = address.toString()
+
+    let accessController
+    if (options.accessControllerAddress) {
+      accessController = new AccessController(this._ipfs)
+      await accessController.load(options.accessControllerAddress)
+    }
+
+    const opts = Object.assign({ replicate: true }, options, { 
+      accessController: accessController, 
+      keystore: this.keystore,
+      cache: this._cache,
+    })
+
+    const store = new Store(this._ipfs, this.id, address, opts)
+    store.events.on('write', this._onWrite.bind(this))
+    store.events.on('closed', this._onClosed.bind(this))
+
+    this.stores[addr] = store
+
+    if(opts.replicate && this._pubsub)
+      this._pubsub.subscribe(addr, this._onMessage.bind(this), this._onPeerConnected.bind(this))
+
+    return store
+  }
+
+  // Callback for local writes to the database. We the update to pubsub.
+  _onWrite (address, hash, entry, heads) {
+    if(!heads) throw new Error("'heads' not defined")
+    if(this._pubsub) setImmediate(() => this._pubsub.publish(address, heads))
+  }
+
+  // Callback for receiving a message from the network
+  _onMessage (address, heads) {
+    const store = this.stores[address]
+    try {
+      logger.debug(`Received heads for '${address}':\n`, JSON.stringify(heads, null, 2))
+      store.sync(heads)
+    } catch (e) {
+      logger.error(e)
+    }
+  }
+
+  // Callback for when a peer connected to a database
+  _onPeerConnected (address, peer, room) {
+    logger.debug(`New peer '${peer}' connected to '${address}'`)
+    const store = this.stores[address]
+    if (store) {
+      // Send the newly connected peer our latest heads
+      let heads = store._oplog.heads
+      if (heads.length > 0) {
+        logger.debug(`Send latest heads:\n`, JSON.stringify(heads, null, 2))
+        room.sendTo(peer, new Buffer(JSON.stringify(heads)))
+      }
+      store.events.emit('peer', peer)
+    }
+  }
+
+  // Callback when database was closed
+  _onClosed (address) {
+    logger.debug(`Database '${address}' was closed`)
+
+    // Remove the callback from the database
+    this.stores[address].events.removeAllListeners('closed')
+
+    // Unsubscribe from pubsub
+    if(this._pubsub)
+      this._pubsub.unsubscribe(address)
+
+    delete this.stores[address]
+  }
+
+  /* Create and Open databases */
+
   /*
     options = {
-      write: [] // array of keys that can write to this database
+      admin: [], // array of keys that are the admins of this database (same as write access)
+      write: [], // array of keys that can write to this database
+      directory: './orbitdb', // directory in which to place the database files
+      overwrite: false, // whether we should overwrite the existing database if it exists
+
     }
   */
   async create (name, type, options = {}) {
@@ -150,6 +249,9 @@ class OrbitDB {
       options = {
         localOnly: false // if set to true, throws an error if database can't be found locally
         create: false // wether to create the database
+        type: TODO
+        overwrite: TODO
+
       }
    */
   async open (address, options = {}) {
@@ -230,91 +332,6 @@ class OrbitDB {
       return this._createStore(KeyValueStore, address, options)
     else
       throw new Error(`Invalid database type '${type}'`)
-  }
-
-  /* Private methods */
-  async _createStore (Store, address, options) {
-    const addr = address.toString()
-
-    let accessController
-    if (options.accessControllerAddress) {
-      accessController = new AccessController(this._ipfs)
-      await accessController.load(options.accessControllerAddress)
-    }
-
-    const opts = Object.assign({ replicate: true }, options, { 
-      accessController: accessController, 
-      keystore: this.keystore,
-      cache: this._cache,
-    })
-
-    const store = new Store(this._ipfs, this.id, address, opts)
-    store.events.on('write', this._onWrite.bind(this))
-    store.events.on('ready', this._onReady.bind(this))
-    store.events.on('close', this._onClose.bind(this))
-
-    this.stores[addr] = store
-
-    if(opts.replicate && this._pubsub)
-      this._pubsub.subscribe(addr, this._onMessage.bind(this), this._onPeerConnected.bind(this))
-
-    return store
-  }
-
-  // Callback for receiving a message from the network
-  _onMessage (address, heads) {
-    const store = this.stores[address]
-    try {
-      logger.debug(`New messages in '${address}':\n`, JSON.stringify(heads, null, 2))
-      store.sync(heads)
-    } catch (e) {
-      logger.error(e)
-    }
-  }
-
-  // Callback for when a peer connected to a database
-  _onPeerConnected (address, peer, room) {
-    logger.debug(`New peer '${peer}' connected to '${address}'`)
-    const store = this.stores[address]
-    if (store) {
-      // Send the newly connected peer our latest heads
-      let heads = store._oplog.heads
-      if (heads.length > 0) {
-        logger.debug(`Send latest heads:\n`, JSON.stringify(heads, null, 2))
-        room.sendTo(peer, new Buffer(JSON.stringify(heads)))
-      }
-      store.events.emit('peer', peer)
-    }
-  }
-
-  // Callback for local writes to the database. We the update to pubsub.
-  _onWrite (address, hash, entry, heads) {
-    if(!heads) throw new Error("'heads' not defined")
-    if(this._pubsub) setImmediate(() => this._pubsub.publish(address, heads))
-  }
-
-  // Callback for database being ready
-  _onReady (address, heads) {
-    if(heads && this._pubsub) {
-      setTimeout(() => this._pubsub.publish(address, heads), 1000)
-    }
-  }
-
-  _onClose (address) {
-    if(this._pubsub)
-      this._pubsub.unsubscribe(address)
-
-    const store = this.stores[address]
-
-    if (store) {
-      store.events.removeAllListeners('load.progress')
-      store.events.removeAllListeners('replicated')
-      store.events.removeAllListeners('write')
-      store.events.removeAllListeners('ready')
-      store.events.removeAllListeners('close')
-      store.close()
-      delete this.stores[address]
-    }
   }
 
   static isValidType (type) {

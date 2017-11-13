@@ -29,26 +29,31 @@ describe('CounterStore', function() {
     ipfs2 = await startIpfs(config.daemon2)
   })
 
-  after(() => {
+  after(async () => {
     if (orbitdb1)
-      orbitdb1.disconnect()
+      orbitdb1.stop()
 
     if (orbitdb2)
-      orbitdb2.disconnect()
+      orbitdb2.stop()
 
     if (ipfs1)
-      ipfs1.stop()
+      await ipfs1.stop()
 
     if (ipfs2)
-      ipfs2.stop()
-
-    ipfs1 = null
-    ipfs2 = null
+      await ipfs2.stop()
   })
 
   beforeEach(() => {
     orbitdb1 = new OrbitDB(ipfs1, './orbitdb/1')
     orbitdb2 = new OrbitDB(ipfs2, './orbitdb/2')
+  })
+
+  afterEach(() => {
+    if (orbitdb1)
+      orbitdb1.stop()
+
+    if (orbitdb2)
+      orbitdb2.stop()
   })
 
   describe('counters', function() {
@@ -59,12 +64,14 @@ describe('CounterStore', function() {
       address = counter.address.toString()
       await mapSeries([13, 1], (f) => counter.inc(f))
       assert.equal(counter.value, 14)
+      await counter.close()
     })
 
     it('opens a saved counter', async () => {
       const counter = await orbitdb1.counter(address, { path: dbPath1 })
       await counter.load()
       assert.equal(counter.value, 14)
+      await counter.close()
     })
 
     it('syncs counters', async () => {

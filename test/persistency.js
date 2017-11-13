@@ -23,11 +23,12 @@ describe('orbit-db - Persistency', function() {
     orbitdb1 = new OrbitDB(ipfs, dbPath + '/1')
   })
 
-  after(() => {
+  after(async () => {
     if(orbitdb1) 
-      orbitdb1.disconnect()
+      orbitdb1.stop()
 
-    ipfs.stop()
+    if (ipfs)
+      await ipfs.stop()
   })
 
   describe('load', function() {

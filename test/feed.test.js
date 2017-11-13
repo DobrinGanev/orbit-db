@@ -26,14 +26,15 @@ describe('orbit-db - Feed', function() {
     orbitdb2 = new OrbitDB(ipfs, dbPath + '/2')
   })
 
-  after(() => {
+  after(async () => {
     if(orbitdb1) 
-      orbitdb1.disconnect()
+      orbitdb1.stop()
 
     if(orbitdb2) 
-      orbitdb2.disconnect()
+      orbitdb2.stop()
 
-    ipfs.stop()
+    if (ipfs)
+      await ipfs.stop()
   })
 
   describe('Feed', function() {

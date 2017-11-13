@@ -6,6 +6,7 @@ const rmrf = require('rimraf')
 const OrbitDB = require('../src/OrbitDB')
 const config = require('./config')
 const startIpfs = require('./start-ipfs')
+const stopIpfs = require('./stop-ipfs')
 const waitForPeers = require('./wait-for-peers')
 
 const dbPath1 = './orbitdb/tests/replicate-and-load/1'
@@ -31,22 +32,21 @@ describe('orbit-db - Replicate and Load', function() {
     orbitdb2 = new OrbitDB(ipfs2, dbPath2)
   })
 
-  after(() => {
+  after(async () => {
     if(orbitdb1) 
-      orbitdb1.disconnect()
+      await orbitdb1.stop()
 
     if(orbitdb2) 
-      orbitdb2.disconnect()
+      await orbitdb2.stop()
 
     if (ipfs1)
-      ipfs1.stop()
+      await stopIpfs(ipfs1)
 
     if (ipfs2)
-      ipfs2.stop()
+      await stopIpfs(ipfs2)
   })
 
   describe('two peers', function() {
-
     // Opens two databases db1 and db2 and gives write-access to both of the peers
     const openDatabases1 = async (options) => {
       // Set write access for both clients
@@ -56,7 +56,7 @@ describe('orbit-db - Replicate and Load', function() {
       ],
 
       options = Object.assign({}, options, { path: dbPath1 })
-      db1 = await orbitdb1.eventlog('tests', options)
+      db1 = await orbitdb1.eventlog('replicate-and-load-tests', options)
       // Set 'localOnly' flag on and it'll error if the database doesn't exist locally
       options = Object.assign({}, options, { path: dbPath2 })
       db2 = await orbitdb2.eventlog(db1.address.toString(), options)

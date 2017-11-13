@@ -29,11 +29,12 @@ describe('orbit-db - Create & Open', function() {
     orbitdb = new OrbitDB(ipfs, dbPath)
   })
 
-  after(() => {
+  after(async () => {
     if(orbitdb) 
-      orbitdb.disconnect()
+      orbitdb.stop()
 
-    ipfs.stop()
+    if (ipfs)
+      await ipfs.stop()
   })
 
   describe('Create', function() {

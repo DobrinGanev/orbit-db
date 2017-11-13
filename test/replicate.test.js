@@ -6,12 +6,13 @@ const rmrf = require('rimraf')
 const OrbitDB = require('../src/OrbitDB')
 const config = require('./config')
 const startIpfs = require('./start-ipfs')
+const stopIpfs = require('./stop-ipfs')
 const waitForPeers = require('./wait-for-peers')
 
-const dbPath1 = './orbitdb/tests/replication/daemon1'
-const dbPath2 = './orbitdb/tests/replication/daemon2'
-const ipfsPath1 = './orbitdb/tests/replication/daemon1/ipfs'
-const ipfsPath2 = './orbitdb/tests/replication/daemon2/ipfs'
+const dbPath1 = './orbitdb/tests/replication/1'
+const dbPath2 = './orbitdb/tests/replication/2'
+const ipfsPath1 = './orbitdb/tests/replication/1/ipfs'
+const ipfsPath2 = './orbitdb/tests/replication/2/ipfs'
 
 describe('orbit-db - Replication', function() {
   this.timeout(config.timeout)
@@ -31,18 +32,18 @@ describe('orbit-db - Replication', function() {
     orbitdb2 = new OrbitDB(ipfs2, dbPath2)
   })
 
-  after(() => {
+  after(async () => {
     if(orbitdb1) 
-      orbitdb1.disconnect()
+      await orbitdb1.stop()
 
     if(orbitdb2) 
-      orbitdb2.disconnect()
+      await orbitdb2.stop()
 
     if (ipfs1)
-      ipfs1.stop()
+      await stopIpfs(ipfs1)
 
     if (ipfs2)
-      ipfs2.stop()
+      await stopIpfs(ipfs2)
   })
 
   describe('two peers', function() {
