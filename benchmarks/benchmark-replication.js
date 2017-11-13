@@ -4,26 +4,8 @@ const IPFS = require('ipfs')
 const IPFSRepo = require('ipfs-repo')
 const DatastoreLevel = require('datastore-level')
 const OrbitDB = require('../src/OrbitDB')
-const startIpfs = require('../test/start-ipfs')
+const startIpfs = require('../test/utils/start-ipfs')
 const pMapSeries = require('p-map-series')
-
-const conf = {
-  Addresses: {
-    API: '/ip4/127.0.0.1/tcp/0',
-    Swarm: ['/ip4/0.0.0.0/tcp/0'],
-    Gateway: '/ip4/0.0.0.0/tcp/0'
-  },
-  Bootstrap: [],
-  Discovery: {
-    MDNS: {
-      Enabled: true,
-      Interval: 10
-    },
-    webRTCStar: {
-      Enabled: false
-    }
-  },
-}
 
 // Metrics
 let metrics1 = {
@@ -40,6 +22,39 @@ let metrics2 = {
   lastTenSeconds: 0,
 }
 
+const ipfsConf = {
+  Addresses: {
+    API: '/ip4/127.0.0.1/tcp/0',
+    Swarm: ['/ip4/0.0.0.0/tcp/0'],
+    Gateway: '/ip4/0.0.0.0/tcp/0'
+  },
+  Bootstrap: [],
+}
+
+const repoConf = {
+  storageBackends: {
+    blocks: DatastoreLevel,
+  },
+}
+
+const defaultConfig = Object.assign({}, {
+  start: true,
+  EXPERIMENTAL: {
+    pubsub: true,
+    sharding: false,
+    dht: false,
+  },
+  config: ipfsConf
+})
+
+const conf1 = Object.assign({}, defaultConfig, { 
+  repo: new IPFSRepo('./orbitdb/benchmarks/replication/client1/ipfs', repoConf) 
+})
+
+const conf2 = Object.assign({}, defaultConfig, { 
+  repo: new IPFSRepo('./orbitdb/benchmarks/replication/client2/ipfs', repoConf) 
+})
+
 // Write loop
 const queryLoop = async (db) => {
   if (metrics1.totalQueries < updateCount) {
@@ -51,57 +66,7 @@ const queryLoop = async (db) => {
   }
 }
 
-const waitForPeers = (ipfs, channel) => {
-  return new Promise((resolve, reject) => {
-    console.log(`Waiting for peers on ${channel}...`)
-    const interval = setInterval(() => {
-      ipfs.pubsub.peers(channel)
-        .then((peers) => {
-          if (peers.length > 0) {
-            console.log("Found peers, running tests...")
-            clearInterval(interval)
-            resolve()
-          }
-        })
-        .catch((e) => {
-          clearInterval(interval)
-          reject(e)
-        })
-    }, 1000)
-  })
-}
-
-// Start
-console.log("Starting IPFS daemons...")
-
-const repoConf = {
-  storageBackends: {
-    blocks: DatastoreLevel,
-  },
-}
-
-const conf1 = {
-  repo: new IPFSRepo('./orbitdb/benchmarks/replication/client1/ipfs', repoConf),
-  start: true,
-  EXPERIMENTAL: {
-    pubsub: true,
-    sharding: false,
-    dht: false,
-  },
-  config: conf
-}
-
-const conf2 = {
-  repo: new IPFSRepo('./orbitdb/benchmarks/replication/client2/ipfs', repoConf),
-  start: true,
-  EXPERIMENTAL: {
-    pubsub: true,
-    sharding: false,
-    dht: false,
-  },
-  config: conf
-}
-
+// Metrics output function
 const outputMetrics = (name, db, metrics) => {
     metrics.seconds ++
     console.log(`[${name}] ${metrics.queriesPerSecond} queries per second, ${metrics.totalQueries} queries in ${metrics.seconds} seconds (Oplog: ${db._oplog.length})`)
@@ -116,6 +81,9 @@ const outputMetrics = (name, db, metrics) => {
 const database = 'benchmark-replication'
 const updateCount = 2000
 
+// Start
+console.log("Starting IPFS daemons...")
+
 pMapSeries([conf1, conf2], d => startIpfs(d))
   .then(async ([ipfs1, ipfs2]) => {
     try {
@@ -124,12 +92,6 @@ pMapSeries([conf1, conf2], d => startIpfs(d))
       const orbit2 = new OrbitDB(ipfs2, './orbitdb/benchmarks/replication/client2')
       const db1 = await orbit1.eventlog(database, { overwrite: true })
       const db2 = await orbit2.eventlog(db1.address.toString())
-
-      // Wait for peers to connect before starting the write loop
-      // await waitForPeers(ipfs1, db1.address.toString())
-
-      // Wait for peers and before starting the read loop
-      // await waitForPeers(ipfs2, db1.address.toString())
 
       let db1Connected = false
       let db2Connected = false
