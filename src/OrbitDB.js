@@ -38,9 +38,13 @@ class OrbitDB {
     return this.open(address, options)
   }
 
-  async eventlog (address, options = {}) {
+  async log (address, options) {
     options = Object.assign({ create: true, type: 'eventlog' }, options)
     return this.open(address, options)
+  }
+
+  async eventlog (address, options = {}) {
+    return this.log(address, options)
   }
 
   async keyvalue (address, options) {
