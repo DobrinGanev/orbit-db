@@ -5,9 +5,9 @@ const assert = require('assert')
 const rmrf = require('rimraf')
 const mapSeries = require('p-each-series')
 const OrbitDB = require('../src/OrbitDB')
-const config = require('./config')
-const startIpfs = require('./start-ipfs')
-const waitForPeers = require('./wait-for-peers')
+const config = require('./utils/config')
+const startIpfs = require('./utils/start-ipfs')
+const waitForPeers = require('./utils/wait-for-peers')
 
 const dbPath1 = './orbitdb/tests/counters/peer1'
 const dbPath2 = './orbitdb/tests/counters/peer2'

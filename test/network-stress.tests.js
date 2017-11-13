@@ -8,17 +8,10 @@ const pMap = require('p-map')
 const pEachSeries = require('p-each-series')
 const pWhilst = require('p-whilst')
 const OrbitDB = require('../src/OrbitDB')
-const startIpfs = require('./start-ipfs')
+const startIpfs = require('./utils/start-ipfs')
 
 // Settings for the test ipfs daemons
-const config = require('./config.js')
-
-const hasIpfsApiWithPubsub = (ipfs) => {
-  return ipfs.object.get !== undefined
-      && ipfs.object.put !== undefined
-      && ipfs.pubsub.publish !== undefined
-      && ipfs.pubsub.subscribe !== undefined
-}
+const config = require('./utils/config.js')
 
 const waitForPeers = (ipfs, topic) => {
   return new Promise((resolve, reject) => {

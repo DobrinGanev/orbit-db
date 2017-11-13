@@ -3,8 +3,8 @@
 const assert = require('assert')
 const rmrf = require('rimraf')
 const OrbitDB = require('../src/OrbitDB')
-const config = require('./config')
-const startIpfs = require('./start-ipfs')
+const config = require('./utils/config')
+const startIpfs = require('./utils/start-ipfs')
 
 const dbPath = './orbitdb/tests/docstore'
 const ipfsPath = './orbitdb/tests/docstore/ipfs'

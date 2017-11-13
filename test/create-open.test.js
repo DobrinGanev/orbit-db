@@ -7,10 +7,10 @@ const rmrf = require('rimraf')
 const mapSeries = require('p-map-series')
 const OrbitDB = require('../src/OrbitDB')
 const OrbitDBAddress = require('../src/orbit-db-address')
-const first = require('./test-utils').first
-const last = require('./test-utils').last
-const config = require('./config')
-const startIpfs = require('./start-ipfs')
+const { first, last } = require('./utils/test-utils')
+const config = require('./utils/config')
+const startIpfs = require('./utils/start-ipfs')
+const stopIpfs = require('./utils/stop-ipfs')
 
 const dbPath = './orbitdb/tests/create-open'
 const ipfsPath = './orbitdb/tests/create-open/ipfs'
@@ -34,7 +34,7 @@ describe('orbit-db - Create & Open', function() {
       orbitdb.stop()
 
     if (ipfs)
-      await ipfs.stop()
+      await stopIpfs(ipfs)
   })
 
   describe('Create', function() {

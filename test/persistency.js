@@ -4,8 +4,8 @@ const assert = require('assert')
 const mapSeries = require('p-map-series')
 const rmrf = require('rimraf')
 const OrbitDB = require('../src/OrbitDB')
-const config = require('./config')
-const startIpfs = require('./start-ipfs')
+const config = require('./utils/config')
+const startIpfs = require('./utils/start-ipfs')
 
 const dbPath = './orbitdb/tests/persistency'
 const ipfsPath = './orbitdb/tests/persistency/ipfs'
