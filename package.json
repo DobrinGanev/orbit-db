@@ -20,7 +20,7 @@
     "multihashes": "^0.4.12",
     "orbit-db-cache": "~0.0.7",
     "orbit-db-counterstore": "github:orbitdb/orbit-db-counterstore#feat/cli",
-    "orbit-db-docstore": "github:orbitdb/orbit-db-docstore#feat/cli",
+    "orbit-db-docstore": "github:orbitdb/orbit-db-docstore#feat/document-revisions",
     "orbit-db-eventstore": "github:orbitdb/orbit-db-eventstore#feat/cli",
     "orbit-db-feedstore": "github:orbitdb/orbit-db-feedstore#feat/cli",
     "orbit-db-keystore": "haadcode/orbit-db-keystore",
